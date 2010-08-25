@@ -23,20 +23,19 @@ def main():
 def setup_listener():
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.setblocking(0)
-    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     listener.bind(('', LISTEN_PORT))
     listener.listen(1)
 
     dispatchers[listener] = lambda: handle_listener(listener)
 
-def setup_connection():
+def create_connection():
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.connect(('', TARGET_PORT))
     return connection
 
 def handle_listener(sock): 
     client, addr = sock.accept()
-    server = setup_connection()
+    server = create_connection()
 
     buffers[client] = ''
     buffers[server] = ''
@@ -62,9 +61,11 @@ def cleanup(sock):
     del buffers[sock]
 
 def send(sock):
-    if sock in buffers:
-        transmited = sock.send(buffers[sock])
-        buffers[sock] = buffers[sock][transmited:]
+    if sock not in buffers:
+        return
+
+    transmited = sock.send(buffers[sock])
+    buffers[sock] = buffers[sock][transmited:]
 
 if __name__ == '__main__':
     main()
