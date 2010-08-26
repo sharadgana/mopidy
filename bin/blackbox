@@ -8,6 +8,9 @@ TARGET_PORT = 6601
 
 dispatchers = {}
 buffers = {}
+files = {}
+
+# FIXME figure out how to prefix direction etc...
 
 def main():
     setup_listener()
@@ -33,14 +36,24 @@ def create_connection():
     connection.connect(('', TARGET_PORT))
     return connection
 
+def create_file():
+    # FIXME new file per connection, use time as name?
+    # FIXME write comment header explainging syntax
+    return open('/tmp/test', 'w')
+
 def handle_listener(sock): 
     client, addr = sock.accept()
     server = create_connection()
+    file = create_file()
 
     buffers[client] = ''
     buffers[server] = ''
+
     dispatchers[client] = lambda: handle_proxy(client, server)
     dispatchers[server] = lambda: handle_proxy(server, client)
+
+    files[client] = file
+    files[server] = file
 
 def handle_proxy(source, dest):
     try:
@@ -54,17 +67,22 @@ def handle_proxy(source, dest):
     else:
         cleanup(source)
         cleanup(dest)
+        
 
 def cleanup(sock):
-    sock.close()
+    if not files[sock].closed:
+        files[sock].close()
+    del files[sock]
     del dispatchers[sock]
     del buffers[sock]
+    sock.close()
 
 def send(sock):
     if sock not in buffers:
         return
 
     transmited = sock.send(buffers[sock])
+    files[sock].write(buffers[sock][:transmited])
     buffers[sock] = buffers[sock][transmited:]
 
 if __name__ == '__main__':
