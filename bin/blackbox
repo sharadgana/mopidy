@@ -8,10 +8,8 @@ LISTEN_PORT = 6600
 TARGET_PORT = 6601
 
 dispatchers = {}
+writers = {}
 buffers = {}
-files = {}
-
-# FIXME figure out how to prefix direction etc...
 
 def main():
     setup_listener()
@@ -53,8 +51,8 @@ def handle_listener(sock):
     dispatchers[client] = lambda: handle_proxy(client, server)
     dispatchers[server] = lambda: handle_proxy(server, client)
 
-    files[client] = file
-    files[server] = file
+    writers[client] = lambda data: file.write('< ' + data)
+    writers[server] = lambda data: file.write('> ' + data)
 
 def handle_proxy(source, dest):
     try:
@@ -72,6 +70,7 @@ def cleanup(sock):
     sock.close()
     del dispatchers[sock]
     del buffers[sock]
+    del writers[sock]
 
 def send(sock):
     if sock not in buffers:
@@ -81,6 +80,7 @@ def send(sock):
         data = buffers[sock][:buffers[sock].index('\n')+1]
         sent = sock.send(data)
         buffers[sock] = buffers[sock][sent:]
+        writers[sock](data[:sent])
 
 if __name__ == '__main__':
     main()
