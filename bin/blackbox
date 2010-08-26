@@ -2,6 +2,7 @@
 
 import socket
 import select
+import time
 
 LISTEN_PORT = 6600
 TARGET_PORT = 6601
@@ -37,9 +38,8 @@ def create_connection():
     return connection
 
 def create_file():
-    # FIXME new file per connection, use time as name?
     # FIXME write comment header explainging syntax
-    return open('/tmp/test', 'w')
+    return open('%d' % time.time(), 'w')
 
 def handle_listener(sock): 
     client, addr = sock.accept()
