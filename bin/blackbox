@@ -63,28 +63,24 @@ def handle_proxy(source, dest):
         data = ''
 
     if len(data):
-        print data,
         buffers[dest] = data
     else:
         cleanup(source)
         cleanup(dest)
-        
 
 def cleanup(sock):
-    if not files[sock].closed:
-        files[sock].close()
-    del files[sock]
+    sock.close()
     del dispatchers[sock]
     del buffers[sock]
-    sock.close()
 
 def send(sock):
     if sock not in buffers:
         return
 
-    transmited = sock.send(buffers[sock])
-    files[sock].write(buffers[sock][:transmited])
-    buffers[sock] = buffers[sock][transmited:]
+    while '\n' in buffers[sock]:
+        data = buffers[sock][:buffers[sock].index('\n')+1]
+        sent = sock.send(data)
+        buffers[sock] = buffers[sock][sent:]
 
 if __name__ == '__main__':
     main()
