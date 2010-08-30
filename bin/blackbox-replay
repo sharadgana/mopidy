@@ -12,15 +12,15 @@ def main():
     if not len(sys.argv) == 2:
         sys.exit(1)
 
-    init_connection()
+    connection = get_connection()
 
     for send, recv in parse_data(sys.argv[1]):
-        assert_response(send, recv)
+        assert_response(connection, send, recv)
 
-def init_connection():
-    global connection
+def get_connection():
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.connect(('', TARGET_PORT))
+    return connection
 
 def parse_data(path):
     previous, send, expected = '', '', ''
@@ -45,12 +45,12 @@ def is_send(line):
 def is_recv(line):
     return line.startswith('< ')
 
-def assert_response(send, expect):
+def assert_response(sock, send, expect):
     if send:
-        connection.send(send)
+        sock.send(send)
     actual = ''
-    while select.select([connection], [], [], 0.1)[0]:
-        actual += connection.recv(8192)
+    while select.select([sock], [], [], 0.1)[0]:
+        actual += sock.recv(8192)
     assert expect == actual, '%s != %s' % (repr(expect), repr(actual))
 
 if __name__ == '__main__':
