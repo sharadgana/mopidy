@@ -1,0 +1,57 @@
+#! /usr/bin/python
+
+import socket
+import select
+import sys
+
+TARGET_PORT = 6601
+
+connection = None
+
+def main():
+    if not len(sys.argv) == 2:
+        sys.exit(1)
+
+    init_connection()
+
+    for send, recv in parse_data(sys.argv[1]):
+        assert_response(send, recv)
+
+def init_connection():
+    global connection
+    connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    connection.connect(('', TARGET_PORT))
+
+def parse_data(path):
+    previous, send, expected = '', '', ''
+
+    for current in open(path).readlines():
+        if is_recv(previous) and is_send(current):
+            yield (send, expected)
+            send, expected = '', ''
+
+        if is_send(current):
+            send += current[2:]
+        elif is_recv(current):
+            expected += current[2:]
+
+        previous = current
+
+    yield (send, expected)
+
+def is_send(line):
+    return line.startswith('> ')
+
+def is_recv(line):
+    return line.startswith('< ')
+
+def assert_response(send, expect):
+    if send:
+        connection.send(send)
+    actual = ''
+    while select.select([connection], [], [], 0.1)[0]:
+        actual += connection.recv(8192)
+    assert expect == actual, '%s != %s' % (repr(expect), repr(actual))
+
+if __name__ == '__main__':
+    main()
