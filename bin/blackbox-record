@@ -81,6 +81,7 @@ def send(sock):
         sent = sock.send(data)
         buffers[sock] = buffers[sock][sent:]
         writers[sock](data[:sent])
+        print data[:sent],
 
 if __name__ == '__main__':
     main()
