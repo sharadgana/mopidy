@@ -1,0 +1,20 @@
+# > is client data, < server data and # for comments
+< OK MPD 0.15.0
+> play "-1"
+< OK
+> command_list_ok_begin
+> status
+> currentsong
+> command_list_end
+< volume: -1
+< repeat: 0
+< random: 0
+< single: 0
+< consume: 0
+< playlist: 1
+< playlistlength: 0
+< xfade: 0
+< state: stop
+< list_OK
+< list_OK
+< OK
