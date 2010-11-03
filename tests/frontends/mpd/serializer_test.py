@@ -295,6 +295,55 @@ class TracksToTagCacheFormatTest(unittest.TestCase):
         self.assertEqual(song_list, formated[0])
 
 
+class TracksToListAllFormatTest(unittest.TestCase):
+    def setUp(self):
+        settings.LOCAL_MUSIC_PATH = '/root/'
+
+    def tearDown(self):
+        settings.runtime.clear()
+
+    def test_no_tracks_gives_empty_list(self):
+        result = translator.tracks_to_listall_format([])
+        self.assertEqual(result, [])
+
+    def test_top_level_files(self):
+        tracks = [
+            Track(uri='file:///root/file1.mp3'),
+            Track(uri='file:///root/file2.mp3'),
+            Track(uri='file:///root/file3.mp3'),
+        ]
+        expected = [
+            ('file', 'file1.mp3'),
+            ('file', 'file2.mp3'),
+            ('file', 'file3.mp3'),
+        ]
+
+        result = translator.tracks_to_listall_format(tracks)
+        self.assertEqual(result, expected)
+
+    def test_multiple_levels(self):
+        tracks = [
+            Track(uri='file:///root/song1.mp3'),
+            Track(uri='file:///root/subdir1/song2.mp3'),
+            Track(uri='file:///root/subdir1/song3.mp3'),
+            Track(uri='file:///root/subdir1/subdir/song4.mp3'),
+            Track(uri='file:///root/subdir2/song5.mp3'),
+        ]
+        expected = [
+            ('file', 'song1.mp3'),
+            ('directory', 'subdir1'),
+            ('file', 'subdir1/song2.mp3'),
+            ('file', 'subdir1/song3.mp3'),
+            ('directory', 'subdir1/subdir'),
+            ('file', 'subdir1/subdir/song4.mp3'),
+            ('directory', 'subdir2'),
+            ('file', 'subdir2/song5.mp3'),
+        ]
+
+        result = translator.tracks_to_listall_format(tracks)
+        self.assertEqual(result, expected)
+
+
 class TracksToDirectoryTreeTest(unittest.TestCase):
     def setUp(self):
         settings.LOCAL_MUSIC_PATH = '/root/'

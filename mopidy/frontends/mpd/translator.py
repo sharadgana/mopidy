@@ -163,6 +163,23 @@ def _add_to_tag_cache(result, folders, files):
         result.extend(track_result)
     result.append(('songList end',))
 
+def tracks_to_listall_format(tracks):
+    result = []
+    _add_to_listall(result, *tracks_to_directory_tree(tracks))
+    return result
+
+def _add_to_listall(result, folders, files):
+    music_folder = settings.LOCAL_MUSIC_PATH
+    regexp = '^' + re.escape(music_folder).rstrip('/') + '/?'
+
+    for track in files:
+        path = uri_to_path(track.uri)
+        result.append(('file', re.sub(regexp, '', path)))
+
+    for path, entry in sorted(folders.items(), key=lambda e: e[0]):
+        result.append(('directory', re.sub(regexp, '', path)))
+        _add_to_listall(result, *entry)
+
 def tracks_to_directory_tree(tracks):
     directories = ({}, [])
     for track in tracks:
