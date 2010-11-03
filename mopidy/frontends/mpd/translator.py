@@ -76,6 +76,13 @@ def order_mpd_track_info(result):
     """
     return sorted(result, key=lambda i: MPD_KEY_ORDER.index(i[0]))
 
+MPD_BASIC_FIELDS = '''
+    Time Artist AlbumArtist Album Title Album Track Date
+'''.split()
+
+def filter_basic_mpd_track_info(result):
+    return filter(lambda r: r[0] in MPD_BASIC_FIELDS, result)
+
 def artists_to_mpd_format(artists):
     """
     Format track artists for output to MPD client.
@@ -163,22 +170,27 @@ def _add_to_tag_cache(result, folders, files):
         result.extend(track_result)
     result.append(('songList end',))
 
-def tracks_to_listall_format(tracks):
+def tracks_to_listall_format(tracks, info=False):
     result = []
-    _add_to_listall(result, *tracks_to_directory_tree(tracks))
+    _add_to_listall(result, info, *tracks_to_directory_tree(tracks))
     return result
 
-def _add_to_listall(result, folders, files):
+def _add_to_listall(result, info, folders, files):
     music_folder = settings.LOCAL_MUSIC_PATH
     regexp = '^' + re.escape(music_folder).rstrip('/') + '/?'
 
     for track in files:
         path = uri_to_path(track.uri)
         result.append(('file', re.sub(regexp, '', path)))
+        if info:
+            track_result = track_to_mpd_format(track)
+            track_result = order_mpd_track_info(track_result)
+            track_result = filter_basic_mpd_track_info(track_result)
+            result.extend(track_result)
 
     for path, entry in sorted(folders.items(), key=lambda e: e[0]):
         result.append(('directory', re.sub(regexp, '', path)))
-        _add_to_listall(result, *entry)
+        _add_to_listall(result, info, *entry)
 
 def tracks_to_directory_tree(tracks):
     directories = ({}, [])

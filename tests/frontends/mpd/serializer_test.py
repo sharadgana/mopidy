@@ -343,6 +343,31 @@ class TracksToListAllFormatTest(unittest.TestCase):
         result = translator.tracks_to_listall_format(tracks)
         self.assertEqual(result, expected)
 
+    def test_with_info(self):
+        track = Track(
+            uri=u'file:///root/song.mp3',
+            artists=[Artist(name=u'name')],
+            name=u'trackname',
+            album=Album(name=u'albumname', num_tracks=2,
+                artists=[Artist(name=u'albumartist')]),
+            track_no=1,
+            date=dt.date(2006, 1, 1),
+            length=4000,
+        )
+        expected = [
+            ('file', 'song.mp3'),
+            ('Time', 4),
+            ('Artist', 'name'),
+            ('AlbumArtist', 'albumartist'),
+            ('Title', 'trackname'),
+            ('Album', 'albumname'),
+            ('Track', '1/2'),
+            ('Date', dt.date(2006, 1, 1)),
+        ]
+
+        result = translator.tracks_to_listall_format([track], info=True)
+        self.assertEqual(result, expected)
+
 
 class TracksToDirectoryTreeTest(unittest.TestCase):
     def setUp(self):
