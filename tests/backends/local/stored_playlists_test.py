@@ -65,7 +65,7 @@ class LocalStoredPlaylistsControllerTest(StoredPlaylistsControllerTest,
         self.assertEqual(uri, contents.strip())
 
     def test_playlists_are_loaded_at_startup(self):
-        track = Track(uri=path_to_uri(path_to_data_dir('uri2')))
+        track = Track(uri=path_to_uri(data_folder('bar/uri2')))
         playlist = Playlist(tracks=[track], name='test')
 
         self.stored.save(playlist)

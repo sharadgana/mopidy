@@ -8,9 +8,9 @@ class LibraryControllerTest(object):
         Album(name='album2', artists=artists[1:2]),
         Album()]
     tracks = [Track(name='track1', length=4000, artists=artists[:1],
-            album=albums[0], uri='file://' + path_to_data_dir('uri1')),
+            album=albums[0], uri='file://' + data_folder('foo/uri1')),
         Track(name='track2', length=4000, artists=artists[1:2],
-            album=albums[1], uri='file://' + path_to_data_dir('uri2')),
+            album=albums[1], uri='file://' + data_folder('bar/uri2')),
         Track()]
 
     def setUp(self):
