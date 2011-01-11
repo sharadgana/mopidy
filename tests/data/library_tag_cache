@@ -24,13 +24,13 @@ Artist: artist2
 Title: track2
 Album: album2
 Time: 4
+songList end
+end: foo
+songList begin
 key: uri3
 file: /uri3
 Artist: artist3
 Title: track3
 Album: album3
 Time: 4
-songList end
-end: foo
-songList begin
 songList end
