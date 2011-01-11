@@ -152,3 +152,16 @@ class LibraryControllerTest(object):
 
         test = lambda: self.library.search(any=[''])
         self.assertRaises(LookupError, test)
+
+        test = lambda: self.library.search(folder=[''])
+        self.assertRaises(LookupError, test)
+
+    def test_folder(self):
+        tracks = self.library.folder('foo')
+        self.assertEqual(set(tracks), set(self.tracks[:1]))
+
+        tracks = self.library.folder('bar')
+        self.assertEqual(set(tracks), set(self.tracks[1:2]))
+
+        tracks = self.library.folder('')
+        self.assertEqual(set(tracks), set(self.tracks))

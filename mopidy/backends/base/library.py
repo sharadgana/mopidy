@@ -77,6 +77,21 @@ class LibraryController(object):
         """
         return self.provider.search(**query)
 
+    def folder(self, folder):
+        """
+        Search the library for tracks that are in the given folder
+
+        Examples::
+
+            # Returns results below the folder foo
+            folder('foo')
+
+        :param folder: folder to lookup
+        :type folder: string
+        :rtype: list of :class:`mopidy.models.Track`
+        """
+        return self.provider.folder(folder)
+
 
 class BaseLibraryProvider(object):
     """

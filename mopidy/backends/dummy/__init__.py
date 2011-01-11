@@ -54,6 +54,8 @@ class DummyLibraryProvider(BaseLibraryProvider):
     def search(self, **query):
         return Playlist()
 
+    def folder(self, folder):
+        return []
 
 class DummyPlaybackProvider(BasePlaybackProvider):
     def pause(self):

@@ -1,6 +1,7 @@
 import glob
 import logging
 import os
+import re
 import shutil
 
 from pykka.actor import ThreadingActor
@@ -249,6 +250,12 @@ class LocalLibraryProvider(BaseLibraryProvider):
                 else:
                     raise LookupError('Invalid lookup field: %s' % field)
         return Playlist(tracks=result_tracks)
+
+    def folder(self, folder):
+        folder = os.path.join(settings.LOCAL_MUSIC_PATH, folder)
+        regexp = re.compile('^' + re.escape(folder) + '/?')
+        return [t for uri, t in self._uri_mapping.iteritems()
+            if regexp.search(uri_to_path(uri))]
 
     def _validate_query(self, query):
         for (_, values) in query.iteritems():
