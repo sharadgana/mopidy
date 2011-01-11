@@ -1,21 +1,29 @@
+from mopidy import settings
+from mopidy.mixers.dummy import DummyMixer
 from mopidy.models import Playlist, Track, Album, Artist
 
 from tests import SkipTest, path_to_data_dir
 
 class LibraryControllerTest(object):
-    artists = [Artist(name='artist1'), Artist(name='artist2'), Artist()]
+    artists = [Artist(name='artist1'), Artist(name='artist2'), Artist(name='artist3')]
     albums = [Album(name='album1', artists=artists[:1]),
         Album(name='album2', artists=artists[1:2]),
-        Album()]
+        Album(name='album3', artists=artists[2:3])]
     tracks = [Track(name='track1', length=4000, artists=artists[:1],
             album=albums[0], uri='file://' + data_folder('foo/uri1')),
         Track(name='track2', length=4000, artists=artists[1:2],
             album=albums[1], uri='file://' + data_folder('bar/uri2')),
-        Track()]
+        Track(name='track3', length=4000, artists=artists[2:3],
+            album=albums[2], uri='file://' + data_folder('uri3'))]
 
     def setUp(self):
-        self.backend = self.backend_class()
+        settings.LOCAL_MUSIC_PATH = data_folder('')
+        self.backend = self.backend_class(mixer_class=DummyMixer)
         self.library = self.backend.library
+
+    def tearDown(self):
+        self.backend.destroy()
+        settings.runtime.clear()
 
     def test_refresh(self):
         self.library.refresh()

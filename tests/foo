@@ -1,0 +1,22 @@
+info_begin
+mpd_version: 0.15.4
+fs_charset: UTF-8
+info_end
+directory: dir1
+mtime: 1288382298
+begin: dir1
+songList begin
+key: blank.mp3
+file: dir1/blank.mp3
+Time: 5
+Artist: artist
+Title: title
+Album: album
+Track: 01/02
+Date: 2010
+mtime: 1288382298
+songList end
+end: dir1
+songList begin
+songList end
+
