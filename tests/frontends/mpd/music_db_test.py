@@ -25,12 +25,12 @@ class MusicDatabaseHandlerTest(unittest.TestCase):
         self.assert_(u'OK' in result)
 
     def test_listall(self):
-        result = self.h.handle_request(u'listall "file:///dev/urandom"')
-        self.assert_(u'ACK [0@0] {} Not implemented' in result)
+        result = self.h.handle_request(u'listall ""')
+        self.assert_(u'OK' in result, result)
 
     def test_listallinfo(self):
-        result = self.h.handle_request(u'listallinfo "file:///dev/urandom"')
-        self.assert_(u'ACK [0@0] {} Not implemented' in result)
+        result = self.h.handle_request(u'listallinfo ""')
+        self.assert_(u'OK' in result)
 
     def test_lsinfo_without_path_returns_same_as_listplaylists(self):
         lsinfo_result = self.h.handle_request(u'lsinfo')
