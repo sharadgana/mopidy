@@ -178,10 +178,11 @@ def tracks_to_listall_format(tracks, info=False):
 def _add_to_listall(result, info, folders, files):
     music_folder = settings.LOCAL_MUSIC_PATH
     regexp = '^' + re.escape(music_folder).rstrip('/') + '/?'
+    regexp = re.compile(regexp)
 
     for track in files:
         path = uri_to_path(track.uri)
-        result.append(('file', re.sub(regexp, '', path)))
+        result.append(('file', regexp.sub('', path)))
         if info:
             track_result = track_to_mpd_format(track)
             track_result = order_mpd_track_info(track_result)
@@ -189,7 +190,7 @@ def _add_to_listall(result, info, folders, files):
             result.extend(track_result)
 
     for path, entry in sorted(folders.items(), key=lambda e: e[0]):
-        result.append(('directory', re.sub(regexp, '', path)))
+        result.append(('directory', regexp.sub('', path)))
         _add_to_listall(result, info, *entry)
 
 def tracks_to_directory_tree(tracks):
