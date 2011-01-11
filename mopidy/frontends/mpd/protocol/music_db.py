@@ -3,6 +3,7 @@ import shlex
 
 from mopidy.frontends.mpd.protocol import handle_pattern, stored_playlists
 from mopidy.frontends.mpd.exceptions import MpdArgError, MpdNotImplemented
+from mopidy.frontends.mpd.translator import tracks_to_listall_format
 
 def _build_query(mpd_query):
     """
@@ -237,7 +238,7 @@ def _list_date(frontend, query):
             dates.add((u'Date', track.date.strftime('%Y-%m-%d')))
     return dates
 
-@handle_pattern(r'^listall "(?P<uri>[^"]+)"')
+@handle_pattern(r'^listall "(?P<uri>[^"]*)"')
 def listall(frontend, uri):
     """
     *musicpd.org, music database section:*
@@ -246,9 +247,10 @@ def listall(frontend, uri):
 
         Lists all songs and directories in ``URI``.
     """
-    raise MpdNotImplemented # TODO
+    tracks = frontend.backend.library.folder(uri)
+    return tracks_to_listall_format(tracks)
 
-@handle_pattern(r'^listallinfo "(?P<uri>[^"]+)"')
+@handle_pattern(r'^listallinfo "(?P<uri>[^"]*)"')
 def listallinfo(frontend, uri):
     """
     *musicpd.org, music database section:*
@@ -258,7 +260,8 @@ def listallinfo(frontend, uri):
         Same as ``listall``, except it also returns metadata info in the
         same format as ``lsinfo``.
     """
-    raise MpdNotImplemented # TODO
+    tracks = frontend.backend.library.folder(uri)
+    return tracks_to_listall_format(tracks, info=True)
 
 @handle_pattern(r'^lsinfo$')
 @handle_pattern(r'^lsinfo "(?P<uri>[^"]*)"$')
