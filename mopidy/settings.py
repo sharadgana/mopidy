@@ -179,6 +179,32 @@ OUTPUTS = (
     u'mopidy.outputs.LocalOutput',
 )
 
+#: The address of the Airport Express device to stream to.
+#:
+#: See: http://en.wikipedia.org/wiki/Remote_Audio_Output_Protocol
+#:
+#: Default::
+#:
+#:    ROAP_OUTPUT_SERVER = None
+ROAP_OUTPUT_SERVER = None
+
+#: The port of the Airport Express device to stream to.
+#:
+#: Default::
+#:
+#:    ROAP_OUTPUT_PORT = 5000
+ROAP_OUTPUT_PORT = 5000
+
+#: Overrides to allow advanced setup of ROAP. Using this settings implies
+#: that all other ROAP_OUTPUT_* settings will be ingored
+#:
+#: For all options see gst-inspect-0.10 apexsink.
+#:
+#: Default::
+#:
+#:    ROAP_OUTPUT_OVERRIDE = None
+ROAP_OUTPUT_OVERRIDE = None
+
 #: Servar that runs Shoutcast server to send stream to.
 #:
 #: Default::
