@@ -5,10 +5,76 @@ Changes
 This change log is used to track all major changes to Mopidy.
 
 
-0.4.0 (in development)
-======================
+v0.5.0 (in development)
+=======================
 
 No description yet.
+
+**Important changes**
+
+- Mopidy now supports running with 1-n outputs at the same time. This feature
+  was mainly added to facilitate Shoutcast support, which Mopidy has also
+  gained. In its current state outputs can not be toggled during runtime.
+
+**Changes**
+
+- Fix local backend time query errors that where coming from stopped pipeline.
+  (Fixes: :issue:`87`)
+
+- Support passing options to GStreamer. See :option:`--help-gst` for a list of
+  available options. (Fixes: :issue:`95`)
+
+- Improve :option:`--list-settings` output. (Fixes: :issue:`91`)
+
+
+v0.4.1 (2011-05-06)
+===================
+
+This is a bug fix release fixing audio problems on older GStreamer and some
+minor bugs.
+
+
+**Bugfixes**
+
+- Fix broken audio on at least GStreamer 0.10.30, which affects Ubuntu 10.10.
+  The GStreamer `appsrc` bin wasn't being linked due to lack of default caps.
+  (Fixes: :issue:`85`)
+
+- Fix crash in :mod:`mopidy.mixers.nad` that occures at startup when the
+  :mod:`io` module is available. We used an `eol` keyword argument which is
+  supported by :meth:`serial.FileLike.readline`, but not by
+  :meth:`io.RawBaseIO.readline`.  When the :mod:`io` module is available, it is
+  used by PySerial instead of the `FileLike` implementation.
+
+- Fix UnicodeDecodeError in MPD frontend on non-english locale. Thanks to
+  Antoine Pierlot-Garcin for the patch. (Fixes: :issue:`88`)
+
+- Do not create Pykka proxies that are not going to be used in
+  :mod:`mopidy.core`. The underlying actor may already intentionally be dead,
+  and thus the program may crash on creating a proxy it doesn't need. Combined
+  with the Pykka 0.12.2 release this fixes a crash in the Last.fm frontend
+  which may occur when all dependencies are installed, but the frontend isn't
+  configured. (Fixes: :issue:`84`)
+
+
+v0.4.0 (2011-04-27)
+===================
+
+Mopidy 0.4.0 is another release without major feature additions. In 0.4.0 we've
+fixed a bunch of issues and bugs, with the help of several new contributors
+who are credited in the changelog below. The major change of 0.4.0 is an
+internal refactoring which clears way for future features, and which also make
+Mopidy work on Python 2.7. In other words, Mopidy 0.4.0 works on Ubuntu 11.04
+and Arch Linux.
+
+Please note that 0.4.0 requires some updated dependencies, as listed under
+*Important changes* below. Also, the known bug in the Spotify playlist
+loading from Mopidy 0.3.0 is still present.
+
+.. warning:: Known bug in Spotify playlist loading
+
+    There is a known bug in the loading of Spotify playlists. To avoid the bug,
+    follow the simple workaround described at :issue:`59`.
 
 
 **Important changes**
@@ -30,7 +96,7 @@ No description yet.
 
 - Mopidy now use Pykka actors for thread management and inter-thread
   communication. The immediate advantage of this is that Mopidy now works on
-  Python 2.7. (Fixes: :issue:`66`)
+  Python 2.7, which is the default on e.g. Ubuntu 11.04. (Fixes: :issue:`66`)
 
 - Spotify backend:
 
@@ -39,6 +105,11 @@ No description yet.
 
   - Better error messages on wrong login or network problems. Thanks to Antoine
     Pierlot-Garcin for patches to Mopidy and Pyspotify. (Fixes: :issue:`77`)
+
+  - Reduce log level for trivial log messages from warning to info. (Fixes:
+    :issue:`71`)
+
+  - Pause playback on network connection errors. (Fixes: :issue:`65`)
 
 - Local backend:
 
@@ -61,14 +132,32 @@ No description yet.
   - Fix bug where ``status`` returned ``song: None``, which caused MPDroid to
     crash. (Fixes: :issue:`69`)
 
+  - Gracefully fallback to IPv4 sockets on systems that supports IPv6, but has
+    turned it off. (Fixes: :issue:`75`)
+
+- GStreamer output:
+
+  - Use ``uridecodebin`` for playing audio from both Spotify and the local
+    backend. This contributes to support for multiple backends simultaneously.
+
 - Settings:
 
   - Fix crash on ``--list-settings`` on clean installation. Thanks to Martins
     Grunskis for the bug report and patch. (Fixes: :issue:`63`)
 
+- Packaging:
 
-0.3.1 (2010-01-22)
-==================
+  - Replace test data symlinks with real files to avoid symlink issues when
+    installing with pip. (Fixes: :issue:`68`)
+
+- Debugging:
+
+  - Include platform, architecture, Linux distribution, and Python version in
+    the debug log, to ease debugging of issues with attached debug logs.
+
+
+v0.3.1 (2010-01-22)
+===================
 
 A couple of fixes to the 0.3.0 release is needed to get a smooth installation.
 
@@ -81,8 +170,8 @@ A couple of fixes to the 0.3.0 release is needed to get a smooth installation.
   installed if the installation is executed as the root user.
 
 
-0.3.0 (2010-01-22)
-==================
+v0.3.0 (2010-01-22)
+===================
 
 Mopidy 0.3.0 brings a bunch of small changes all over the place, but no large
 changes. The main features are support for high bitrate audio from Spotify, and
@@ -236,8 +325,8 @@ to this problem.
     :class:`mopidy.outputs.base.BaseOutput`.
 
 
-0.2.1 (2011-01-07)
-==================
+v0.2.1 (2011-01-07)
+===================
 
 This is a maintenance release without any new features.
 
@@ -249,8 +338,8 @@ This is a maintenance release without any new features.
   failure.
 
 
-0.2.0 (2010-10-24)
-==================
+v0.2.0 (2010-10-24)
+===================
 
 In Mopidy 0.2.0 we've added a `Last.fm <http://www.last.fm/>`_ scrobbling
 support, which means that Mopidy now can submit meta data about the tracks you
@@ -317,8 +406,8 @@ searching at the same time, thanks to Valentin David.
   should now exit immediately.
 
 
-0.1.0 (2010-08-23)
-==================
+v0.1.0 (2010-08-23)
+===================
 
 After three weeks of long nights and sprints we're finally pleased enough with
 the state of Mopidy to remove the alpha label, and do a regular release.
@@ -449,8 +538,8 @@ fixing the OS X issues for a future release. You can track the progress at
     :meth:`mopidy.backends.base.BaseStoredPlaylistsController.get()` instead.
 
 
-0.1.0a3 (2010-08-03)
-====================
+v0.1.0a3 (2010-08-03)
+=====================
 
 In the last two months, Mopidy's MPD frontend has gotten lots of stability
 fixes and error handling improvements, proper support for having the same track
@@ -527,8 +616,8 @@ Enjoy the best alpha relase of Mopidy ever :-)
     ``cp_track``.
 
 
-0.1.0a2 (2010-06-02)
-====================
+v0.1.0a2 (2010-06-02)
+=====================
 
 It has been a rather slow month for Mopidy, but we would like to keep up with
 the established pace of at least a release per month.
@@ -543,8 +632,8 @@ the established pace of at least a release per month.
   control :class:`mopidy.mixers.alsa.AlsaMixer` should use.
 
 
-0.1.0a1 (2010-05-04)
-====================
+v0.1.0a1 (2010-05-04)
+=====================
 
 Since the previous release Mopidy has seen about 300 commits, more than 200 new
 tests, a libspotify release, and major feature additions to Spotify. The new
@@ -584,8 +673,8 @@ As always, report problems at our IRC channel or our issue tracker. Thanks!
 - And much more.
 
 
-0.1.0a0 (2010-03-27)
-====================
+v0.1.0a0 (2010-03-27)
+=====================
 
 "*Release early. Release often. Listen to your customers.*" wrote Eric S.
 Raymond in *The Cathedral and the Bazaar*.

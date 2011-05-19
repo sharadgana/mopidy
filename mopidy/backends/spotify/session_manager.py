@@ -29,7 +29,7 @@ class SpotifySessionManager(BaseThread, PyspotifySessionManager):
         BaseThread.__init__(self)
         self.name = 'SpotifySMThread'
 
-        self.output = None
+        self.gstreamer = None
         self.backend = None
 
         self.connected = threading.Event()
@@ -40,9 +40,9 @@ class SpotifySessionManager(BaseThread, PyspotifySessionManager):
         self.connect()
 
     def setup(self):
-        output_refs = ActorRegistry.get_by_class(GStreamer)
-        assert len(output_refs) == 1, 'Expected exactly one running output.'
-        self.output = output_refs[0].proxy()
+        gstreamer_refs = ActorRegistry.get_by_class(GStreamer)
+        assert len(gstreamer_refs) == 1, 'Expected exactly one running gstreamer.'
+        self.gstreamer = gstreamer_refs[0].proxy()
 
         backend_refs = ActorRegistry.get_by_class(Backend)
         assert len(backend_refs) == 1, 'Expected exactly one running backend.'
@@ -74,7 +74,11 @@ class SpotifySessionManager(BaseThread, PyspotifySessionManager):
 
     def connection_error(self, session, error):
         """Callback used by pyspotify"""
-        logger.error(u'Spotify connection error: %s', error)
+        if error is None:
+            logger.info(u'Spotify connection error resolved')
+        else:
+            logger.error(u'Spotify connection error: %s', error)
+            self.backend.playback.pause()
 
     def message_to_user(self, session, message):
         """Callback used by pyspotify"""
@@ -102,7 +106,7 @@ class SpotifySessionManager(BaseThread, PyspotifySessionManager):
             'sample_rate': sample_rate,
             'channels': channels,
         }
-        self.output.deliver_data(capabilites, bytes(frames))
+        self.gstreamer.emit_data(capabilites, bytes(frames))
 
     def play_token_lost(self, session):
         """Callback used by pyspotify"""
@@ -116,7 +120,7 @@ class SpotifySessionManager(BaseThread, PyspotifySessionManager):
     def end_of_track(self, session):
         """Callback used by pyspotify"""
         logger.debug(u'End of data stream reached')
-        self.output.end_of_data_stream()
+        self.gstreamer.emit_end_of_stream()
 
     def refresh_stored_playlists(self):
         """Refresh the stored playlists in the backend with fresh meta data

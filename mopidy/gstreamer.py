@@ -13,45 +13,14 @@ from mopidy.backends.base import Backend
 
 logger = logging.getLogger('mopidy.gstreamer')
 
-class BaseOutput(object):
-    def connect_bin(self, pipeline, element_to_link_to):
-        """
-        Connect output bin to pipeline and given element.
-        """
-        description = 'queue ! %s' % self.describe_bin()
-        logger.debug('Adding new output to tee: %s', description)
-
-        output = self.parse_bin(description)
-        self.modify_bin(output)
-
-        pipeline.add(output)
-        output.sync_state_with_parent()
-        gst.element_link_many(element_to_link_to, output)
-
-    def parse_bin(self, description):
-        return gst.parse_bin_from_description(description, True)
-
-    def modify_bin(self, output):
-        """
-        Modifies bin before it is installed if needed
-        """
-        pass
-
-    def describe_bin(self):
-        """
-        Describe bin to be parsed.
-
-        Must be implemented by subclasses.
-        """
-        raise NotImplementedError
-
-    def set_properties(self, element, properties):
-        """
-        Set properties on element if they have a value.
-        """
-        for key, value in properties.items():
-            if value:
-                element.set_property(key, value)
+default_caps = gst.Caps("""
+    audio/x-raw-int,
+    endianness=(int)1234,
+    channels=(int)2,
+    width=(int)16,
+    depth=(int)16,
+    signed=(boolean)true,
+    rate=(int)44100""")
 
 
 class GStreamer(ThreadingActor):
@@ -60,117 +29,197 @@ class GStreamer(ThreadingActor):
 
     **Settings:**
 
-    - :attr:`mopidy.settings.GSTREAMER_AUDIO_SINK`
+    - :attr:`mopidy.settings.OUTPUTS`
 
     """
 
     def __init__(self):
-        self.gst_pipeline = None
+        self._pipeline = None
+        self._source = None
+        self._taginject = None
+        self._tee = None
+        self._uridecodebin = None
+        self._volume = None
+        self._outputs = []
+        self._handlers = {}
 
     def on_start(self):
-        self._setup_gstreamer()
+        # **Warning:** :class:`GStreamer` requires
+        # :class:`mopidy.utils.process.GObjectEventThread` to be running. This
+        # is not enforced by :class:`GStreamer` itself.
+        self._setup_pipeline()
+        self._setup_outputs()
+        self._setup_message_processor()
 
-    def _setup_gstreamer(self):
-        """
-        **Warning:** :class:`GStreamerOutput` requires
-        :class:`mopidy.utils.process.GObjectEventThread` to be running. This is
-        not enforced by :class:`GStreamerOutput` itself.
-        """
-        base_pipeline = ' ! '.join([
+    def _setup_pipeline(self):
+        description = ' ! '.join([
+            'uridecodebin name=uri',
             'audioconvert name=convert',
             'volume name=volume',
-            'taginject name=tag',
-            'tee name=tee',
-        ])
+            'taginject name=inject',
+            'tee name=tee'])
 
-        logger.debug(u'Setting up base GStreamer pipeline: %s', base_pipeline)
+        logger.debug(u'Setting up base GStreamer pipeline: %s', description)
 
-        self.gst_pipeline = gst.parse_launch(base_pipeline)
+        self._pipeline = gst.parse_launch(description)
+        self._taginject = self._pipeline.get_by_name('inject')
+        self._tee = self._pipeline.get_by_name('tee')
+        self._volume = self._pipeline.get_by_name('volume')
+        self._uridecodebin = self._pipeline.get_by_name('uri')
 
-        self.gst_tee = self.gst_pipeline.get_by_name('tee')
-        self.gst_convert = self.gst_pipeline.get_by_name('convert')
-        self.gst_volume = self.gst_pipeline.get_by_name('volume')
-        self.gst_taginject = self.gst_pipeline.get_by_name('tag')
+        self._uridecodebin.connect('notify::source', self._on_new_source)
+        self._uridecodebin.connect('pad-added', self._on_new_pad,
+            self._pipeline.get_by_name('convert').get_pad('sink'))
 
-        self.gst_uridecodebin = gst.element_factory_make('uridecodebin', 'uri')
-        self.gst_uridecodebin.connect('pad-added', self._process_new_pad,
-            self.gst_convert.get_pad('sink'))
-        self.gst_pipeline.add(self.gst_uridecodebin)
-
+    def _setup_outputs(self):
         for output in settings.OUTPUTS:
-            output_cls = get_class(output)()
-            output_cls.connect_bin(self.gst_pipeline, self.gst_tee)
+            get_class(output)(self).connect()
 
-        # Setup bus and message processor
-        gst_bus = self.gst_pipeline.get_bus()
-        gst_bus.add_signal_watch()
-        gst_bus.connect('message', self._process_gstreamer_message)
+    def _setup_message_processor(self):
+        bus = self._pipeline.get_bus()
+        bus.add_signal_watch()
+        bus.connect('message', self._on_message)
 
-    def _process_new_pad(self, source, pad, target_pad):
-        pad.link(target_pad)
+    def _on_new_source(self, element, pad):
+        self._source = element.get_by_name('source')
+        try:
+            self._source.set_property('caps', default_caps)
+        except TypeError:
+            pass
 
-    def _process_gstreamer_message(self, bus, message):
-        """Process messages from GStreamer."""
+    def _on_new_pad(self, source, pad, target_pad):
+        if not pad.is_linked():
+            pad.link(target_pad)
+
+    def _on_message(self, bus, message):
+        if message.src in self._handlers:
+            if self._handlers[message.src](message):
+                return # Message was handeled by output
+
         if message.type == gst.MESSAGE_EOS:
             logger.debug(u'GStreamer signalled end-of-stream. '
                 'Telling backend ...')
             self._get_backend().playback.on_end_of_track()
         elif message.type == gst.MESSAGE_ERROR:
-            self.set_state('NULL')
             error, debug = message.parse_error()
             logger.error(u'%s %s', error, debug)
-            # FIXME Should we send 'stop_playback' to the backend here? Can we
-            # differentiate on how serious the error is?
+            self.stop_playback()
+        elif message.type == gst.MESSAGE_WARNING:
+            error, debug = message.parse_warning()
+            logger.warning(u'%s %s', error, debug)
 
     def _get_backend(self):
         backend_refs = ActorRegistry.get_by_class(Backend)
         assert len(backend_refs) == 1, 'Expected exactly one running backend.'
         return backend_refs[0].proxy()
 
-    def play_uri(self, uri):
-        """Play audio at URI"""
-        self.set_state('READY')
-        self.gst_uridecodebin.set_property('uri', uri)
-        return self.set_state('PLAYING')
+    def set_uri(self, uri):
+        """
+        Set URI of audio to be played.
 
-    def deliver_data(self, caps_string, data):
-        """Deliver audio data to be played"""
-        source = self.gst_pipeline.get_by_name('source')
-        caps = gst.caps_from_string(caps_string)
+        You *MUST* call :meth:`prepare_change` before calling this method.
+
+        :param uri: the URI to play
+        :type uri: string
+        """
+        self._uridecodebin.set_property('uri', uri)
+
+    def emit_data(self, capabilities, data):
+        """
+        Call this to deliver raw audio data to be played.
+
+        :param capabilities: a GStreamer capabilities string
+        :type capabilities: string
+        :param data: raw audio data to be played
+        """
+        caps = gst.caps_from_string(capabilities)
         buffer_ = gst.Buffer(buffer(data))
         buffer_.set_caps(caps)
-        source.set_property('caps', caps)
-        source.emit('push-buffer', buffer_)
+        self._source.set_property('caps', caps)
+        self._source.emit('push-buffer', buffer_)
 
-    def end_of_data_stream(self):
+    def emit_end_of_stream(self):
         """
-        Add end-of-stream token to source.
+        Put an end-of-stream token on the pipeline. This is typically used in
+        combination with :meth:`emit_data`.
 
         We will get a GStreamer message when the stream playback reaches the
         token, and can then do any end-of-stream related tasks.
         """
-        self.gst_pipeline.get_by_name('source').emit('end-of-stream')
+        self._source.emit('end-of-stream')
 
     def get_position(self):
+        """
+        Get position in milliseconds.
+
+        :rtype: int
+        """
+        if self._pipeline.get_state()[1] == gst.STATE_NULL:
+            return 0
         try:
-            position = self.gst_pipeline.query_position(gst.FORMAT_TIME)[0]
+            position = self._pipeline.query_position(gst.FORMAT_TIME)[0]
             return position // gst.MSECOND
         except gst.QueryError, e:
             logger.error('time_position failed: %s', e)
             return 0
 
     def set_position(self, position):
-        self.gst_pipeline.get_state() # block until state changes are done
-        handeled = self.gst_pipeline.seek_simple(gst.Format(gst.FORMAT_TIME),
+        """
+        Set position in milliseconds.
+
+        :param position: the position in milliseconds
+        :type volume: int
+        :rtype: :class:`True` if successful, else :class:`False`
+        """
+        self._pipeline.get_state() # block until state changes are done
+        handeled = self._pipeline.seek_simple(gst.Format(gst.FORMAT_TIME),
             gst.SEEK_FLAG_FLUSH, position * gst.MSECOND)
-        self.gst_pipeline.get_state() # block until seek is done
+        self._pipeline.get_state() # block until seek is done
         return handeled
 
-    def set_state(self, state_name):
+    def start_playback(self):
         """
-        Set the GStreamer state. Returns :class:`True` if successful.
+        Notify GStreamer that it should start playback.
+
+        :rtype: :class:`True` if successfull, else :class:`False`
+        """
+        return self._set_state(gst.STATE_PLAYING)
+
+    def pause_playback(self):
+        """
+        Notify GStreamer that it should pause playback.
+
+        :rtype: :class:`True` if successfull, else :class:`False`
+        """
+        return self._set_state(gst.STATE_PAUSED)
+
+    def prepare_change(self):
+        """
+        Notify GStreamer that we are about to change state of playback.
+
+        This function *MUST* be called before changing URIs or doing
+        changes like updating data that is being pushed. The reason for this
+        is that GStreamer will reset all its state when it changes to
+        :attr:`gst.STATE_READY`.
+        """
+        return self._set_state(gst.STATE_READY)
+
+    def stop_playback(self):
+        """
+        Notify GStreamer that is should stop playback.
+
+        :rtype: :class:`True` if successfull, else :class:`False`
+        """
+        return self._set_state(gst.STATE_NULL)
+
+    def _set_state(self, state):
+        """
+        Internal method for setting the raw GStreamer state.
 
         .. digraph:: gst_state_transitions
+
+            graph [rankdir="LR"];
+            node [fontsize=10];
 
             "NULL" -> "READY"
             "PAUSED" -> "PLAYING"
@@ -179,32 +228,159 @@ class GStreamer(ThreadingActor):
             "READY" -> "NULL"
             "READY" -> "PAUSED"
 
-        :param state_name: NULL, READY, PAUSED, or PLAYING
-        :type state_name: string
-        :rtype: :class:`True` or :class:`False`
+        :param state: State to set pipeline to. One of: `gst.STATE_NULL`,
+            `gst.STATE_READY`, `gst.STATE_PAUSED` and `gst.STATE_PLAYING`.
+        :type state: :class:`gst.State`
+        :rtype: :class:`True` if successfull, else :class:`False`
         """
-        result = self.gst_pipeline.set_state(
-            getattr(gst, 'STATE_' + state_name))
+        result = self._pipeline.set_state(state)
         if result == gst.STATE_CHANGE_FAILURE:
-            logger.warning('Setting GStreamer state to %s: failed', state_name)
+            logger.warning('Setting GStreamer state to %s: failed',
+                state.value_name)
             return False
+        elif result == gst.STATE_CHANGE_ASYNC:
+            logger.debug('Setting GStreamer state to %s: async',
+                state.value_name)
+            return True
         else:
-            logger.debug('Setting GStreamer state to %s: OK', state_name)
+            logger.debug('Setting GStreamer state to %s: OK',
+                state.value_name)
             return True
 
     def get_volume(self):
-        """Get volume in range [0..100]"""
-        return int(self.gst_volume.get_property('volume') * 100)
+        """
+        Get volume level of the GStreamer software mixer.
+
+        :rtype: int in range [0..100]
+        """
+        return int(self._volume.get_property('volume') * 100)
 
     def set_volume(self, volume):
-        """Set volume in range [0..100]"""
-        self.gst_volume.set_property('volume', volume / 100.0)
+        """
+        Set volume level of the GStreamer software mixer.
+
+        :param volume: the volume in the range [0..100]
+        :type volume: int
+        :rtype: :class:`True` if successful, else :class:`False`
+        """
+        self._volume.set_property('volume', volume / 100.0)
         return True
 
     def set_metadata(self, track):
+        """
+        Set track metadata for currently playing song.
+
+        Only needs to be called by sources such as `appsrc` which do not
+        already inject tags in pipeline, e.g. when using :meth:`emit_data` to
+        deliver raw audio data to GStreamer.
+
+        :param track: the current track
+        :type track: :class:`mopidy.modes.Track`
+        """
+        # FIXME what if we want to unset taginject tags?
         tags = u'artist="%(artist)s",title="%(title)s"' % {
             'artist': u', '.join([a.name for a in track.artists]),
             'title': track.name,
         }
         logger.debug('Setting tags to: %s', tags)
-        self.gst_taginject.set_property('tags', tags)
+        self._taginject.set_property('tags', tags)
+
+    def connect_output(self, output):
+        """
+        Connect output to pipeline.
+
+        :param output: output to connect to the pipeline
+        :type output: :class:`gst.Bin`
+        """
+        self._pipeline.add(output)
+        output.sync_state_with_parent() # Required to add to running pipe
+        gst.element_link_many(self._tee, output)
+        self._outputs.append(output)
+        logger.info('Added %s', output.get_name())
+
+    def list_outputs(self):
+        """
+        Get list with the name of all active outputs.
+
+        :rtype: list of strings
+        """
+        return [output.get_name() for output in self._outputs]
+
+    def remove_output(self, output):
+        """
+        Remove output from our pipeline.
+
+        :param output: output to remove from the pipeline
+        :type output: :class:`gst.Bin`
+        """
+        if output not in self._outputs:
+            raise LookupError('Ouput %s not present in pipeline'
+                % output.get_name)
+        teesrc = output.get_pad('sink').get_peer()
+        handler = teesrc.add_event_probe(self._handle_event_probe)
+
+        struct = gst.Structure('mopidy-unlink-tee')
+        struct.set_value('handler', handler)
+
+        event = gst.event_new_custom(gst.EVENT_CUSTOM_DOWNSTREAM, struct)
+        self._tee.send_event(event)
+
+    def _handle_event_probe(self, teesrc, event):
+        if event.type == gst.EVENT_CUSTOM_DOWNSTREAM and event.has_name('mopidy-unlink-tee'):
+            data = self._get_structure_data(event.get_structure())
+
+            output = teesrc.get_peer().get_parent()
+
+            teesrc.unlink(teesrc.get_peer())
+            teesrc.remove_event_probe(data['handler'])
+
+            output.set_state(gst.STATE_NULL)
+            self._pipeline.remove(output)
+
+            logger.warning('Removed %s', output.get_name())
+            return False
+        return True
+
+    def _get_structure_data(self, struct):
+        # Ugly hack to get around missing get_value in pygst bindings :/
+        data = {}
+        def get_data(key, value):
+            data[key] = value
+        struct.foreach(get_data)
+        return data
+
+    def connect_message_handler(self, element, handler):
+        """
+        Attach custom message handler for given element.
+
+        Hook to allow outputs (or other code) to register custom message
+        handlers for all messages coming from the element in question.
+
+        In the case of outputs, :meth:`mopidy.outputs.BaseOutput.on_connect`
+        should be used to attach such handlers and care should be taken to
+        remove them in :meth:`mopidy.outputs.BaseOutput.on_remove` using
+        :meth:`remove_message_handler`.
+
+        The handler callback will only be given the message in question, and
+        is free to ignore the message. However, if the handler wants to prevent
+        the default handling of the message it should return :class:`True`
+        indicating that the message has been handled.
+
+        Note that there can only be one handler per element.
+
+        :param element: element to watch messages from
+        :type element: :class:`gst.Element`
+        :param handler: callable that takes :class:`gst.Message` and returns
+            :class:`True` if the message has been handeled
+        :type handler: callable
+        """
+        self._handlers[element] = handler
+
+    def remove_message_handler(self, element):
+        """
+        Remove custom message handler.
+
+        :param element: element to remove message handling from.
+        :type element: :class:`gst.Element`
+        """
+        self._handlers.pop(element, None)
