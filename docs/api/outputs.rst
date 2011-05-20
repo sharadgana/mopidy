@@ -16,4 +16,5 @@ Output implementations
 * :class:`mopidy.outputs.custom.CustomOutput`
 * :class:`mopidy.outputs.local.LocalOutput`
 * :class:`mopidy.outputs.null.NullOutput`
+* :class:`mopidy.outputs.raop.RaopOutput``
 * :class:`mopidy.outputs.shoutcast.ShoutcastOutput`

@@ -185,15 +185,15 @@ OUTPUTS = (
 #:
 #: Default::
 #:
-#:    ROAP_OUTPUT_SERVER = None
-ROAP_OUTPUT_SERVER = None
+#:    RAOP_OUTPUT_SERVER = None
+RAOP_OUTPUT_SERVER = None
 
 #: The port of the Airport Express device to stream to.
 #:
 #: Default::
 #:
-#:    ROAP_OUTPUT_PORT = 5000
-ROAP_OUTPUT_PORT = 5000
+#:    RAOP_OUTPUT_PORT = 5000
+RAOP_OUTPUT_PORT = 5000
 
 #: Servar that runs Shoutcast server to send stream to.
 #:
