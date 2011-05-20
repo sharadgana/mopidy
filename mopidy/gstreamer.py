@@ -73,8 +73,10 @@ class GStreamer(ThreadingActor):
             self._pipeline.get_by_name('convert').get_pad('sink'))
 
     def _setup_outputs(self):
-        for output in settings.OUTPUTS:
-            get_class(output)(self).connect()
+        for klass in settings.OUTPUTS:
+            output = get_class(klass)(self)
+            output.connect()
+            self._outputs.append(output)
 
     def _setup_message_processor(self):
         bus = self._pipeline.get_bus()
@@ -300,7 +302,6 @@ class GStreamer(ThreadingActor):
         self._pipeline.add(output)
         output.sync_state_with_parent() # Required to add to running pipe
         gst.element_link_many(self._tee, output)
-        self._outputs.append(output)
         logger.info('Added %s', output.get_name())
 
     def list_outputs(self):
