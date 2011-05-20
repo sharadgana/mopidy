@@ -223,3 +223,22 @@ class Playlist(ImmutableObject):
 
     def mpd_format(self, *args, **kwargs):
         return translator.playlist_to_mpd_format(self, *args, **kwargs)
+
+class Output(ImmutableObject):
+    """
+        :param index: index refering to output
+        :type index: in
+        :param name: output name
+        :type name: string
+        :param enabled: if the output is active
+        :type enabled: boolean
+    """
+
+    #: The output's index. Read-only.
+    index = None
+
+    #; The output's name. Read-only.
+    name = None
+
+    # The output's status. Read-only.
+    enabled = None
