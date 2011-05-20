@@ -8,8 +8,9 @@ from pykka.actor import ThreadingActor
 from pykka.registry import ActorRegistry
 
 from mopidy import settings
-from mopidy.utils import get_class
 from mopidy.backends.base import Backend
+from mopidy.models import Output
+from mopidy.utils import get_class
 
 logger = logging.getLogger('mopidy.gstreamer')
 
@@ -107,6 +108,10 @@ class GStreamer(ThreadingActor):
         elif message.type == gst.MESSAGE_WARNING:
             error, debug = message.parse_warning()
             logger.warning(u'%s %s', error, debug)
+
+    def _is_output_enabled(self, output):
+        srcpad = output.get_pad('src')
+        return bool(srcpad and srcpad.is_linked())
 
     def _get_backend(self):
         backend_refs = ActorRegistry.get_by_class(Backend)
@@ -300,11 +305,16 @@ class GStreamer(ThreadingActor):
 
     def list_outputs(self):
         """
-        Get list with the name of all active outputs.
+        Get list of all outputs.
 
-        :rtype: list of strings
+        :rtype: list of :class:`mopidy.model.Output`
         """
-        return [output.get_name() for output in self._outputs]
+        outputs = []
+        for i, output in enumerate(self._outputs):
+            name = output.get_name()
+            enabled = self._is_output_enabled(output)
+            outputs.append(Output(index=i, name=name, enabled=enabled))
+        return outputs
 
     def remove_output(self, output):
         """
@@ -316,6 +326,10 @@ class GStreamer(ThreadingActor):
         if output not in self._outputs:
             raise LookupError('Ouput %s not present in pipeline'
                 % output.get_name)
+
+        if not self._is_output_enabled(output):
+            return # FIXME raise some error instead?
+
         teesrc = output.get_pad('sink').get_peer()
         handler = teesrc.add_event_probe(self._handle_event_probe)
 
@@ -335,7 +349,6 @@ class GStreamer(ThreadingActor):
             teesrc.remove_event_probe(data['handler'])
 
             output.set_state(gst.STATE_NULL)
-            self._pipeline.remove(output)
 
             logger.warning('Removed %s', output.get_name())
             return False
