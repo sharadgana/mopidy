@@ -34,6 +34,14 @@ class MpdDispatcher(object):
         assert len(mixer_refs) == 1, 'Expected exactly one running mixer.'
         self.mixer = mixer_refs[0].proxy()
 
+        # FIXME hack to avoid import loop, should be removed.
+        # Getting this via backends is possible, but won't make sense with
+        # multiple backends. Better ideas?
+        from mopidy.gstreamer import GStreamer
+        gstreamer_refs = ActorRegistry.get_by_class(GStreamer)
+        assert len(mixer_refs) == 1, 'Expected exactly one running gstreamer.'
+        self.gstreamer = gstreamer_refs[0].proxy()
+
         self.command_list = False
         self.command_list_ok = False
 

@@ -32,8 +32,11 @@ def outputs(frontend):
 
         Shows information about all outputs.
     """
-    return [
-        ('outputid', 0),
-        ('outputname', None),
-        ('outputenabled', 1),
-    ]
+    outputs = []
+    for output in frontend.gstreamer.list_outputs().get():
+        outputs.extend([
+            ('outputid', output.index),
+            ('outputname', output.name),
+            ('outputenabled', int(output.enabled)),
+        ])
+    return outputs
