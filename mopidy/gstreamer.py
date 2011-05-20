@@ -111,10 +111,6 @@ class GStreamer(ThreadingActor):
             error, debug = message.parse_warning()
             logger.warning(u'%s %s', error, debug)
 
-    def _is_output_enabled(self, output):
-        srcpad = output.get_pad('src')
-        return bool(srcpad and srcpad.is_linked())
-
     def _get_backend(self):
         backend_refs = ActorRegistry.get_by_class(Backend)
         assert len(backend_refs) == 1, 'Expected exactly one running backend.'
@@ -313,7 +309,7 @@ class GStreamer(ThreadingActor):
         outputs = []
         for i, output in enumerate(self._outputs):
             name = output.get_name()
-            enabled = self._is_output_enabled(output)
+            enabled = output.is_enabled()
             outputs.append(Output(index=i, name=name, enabled=enabled))
         return outputs
 
@@ -328,7 +324,7 @@ class GStreamer(ThreadingActor):
             raise LookupError('Ouput %s not present in pipeline'
                 % output.get_name)
 
-        if not self._is_output_enabled(output):
+        if not output.is_enabled():
             return # FIXME raise some error instead?
 
         teesrc = output.get_pad('sink').get_peer()

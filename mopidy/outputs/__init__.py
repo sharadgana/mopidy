@@ -25,6 +25,10 @@ class BaseOutput(object):
         logger.debug('Creating new output: %s', description)
         return gst.parse_bin_from_description(description, True)
 
+    def is_enabled(self):
+        """Return if output's bin is connected to some pipeline."""
+        return bool(self.bin and self.bin.get_parent())
+
     def connect(self):
         """Attach output to GStreamer pipeline."""
         self.gstreamer.connect_output(self.bin)
